@@ -77,7 +77,7 @@
   }
   function updateStatus() {
     dot.classList.toggle("on", state.open);
-    statusText.textContent = state.open ? "静默记录中 · 你的话不会发给 Claude" : "已关闭";
+    statusText.textContent = state.open ? "默默记录中 · 你的话不会发给 Claude" : "已关闭";
   }
 
   // ---- 记一条 ----
@@ -424,6 +424,8 @@
   .target { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #e2e2e5; border-radius: 8px; }
   .target-head { font-size: 12px; font-weight: 600; color: #b45309; display: flex; align-items: center; gap: 8px; }
   .t-add, .t-clear { background: #fff; border: 1px solid #d7d9dd; color: #6b7280; border-radius: 5px; cursor: pointer; font-size: 12px; padding: 1px 7px; line-height: 1.4; }
+  .t-clear { display: inline-flex; align-items: center; justify-content: center; }
+  .t-clear svg { width: 13px; height: 13px; }
   .t-add:hover { border-color: #10b981; color: #059669; }
   .t-clear:hover { border-color: #fca5a5; color: #dc2626; }
   .t-select { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #d7d9dd; background: #fff; color: #1f2328; font-size: 12px; }
@@ -436,7 +438,7 @@
   <div class="head">
     <span class="dot"></span>
     <div class="htext">
-      <div class="htitle">静默记录</div>
+      <div class="htitle">Quiet Crab</div>
       <div class="status">已关闭</div>
     </div>
     <button class="dock" title="停靠到右侧 / 悬浮">⇥</button>
@@ -459,10 +461,10 @@
         <label style="align-items:flex-start;flex-direction:column;gap:4px;">给 Claude 的指令：<textarea class="instr"></textarea></label>
         <div class="exprow">导出记录：<button class="exp-txt">.txt</button><button class="exp-md">.md</button><button class="exp-json">.json</button></div>
         <div class="target">
-          <div class="target-head">目标 Claude 标签页 <button class="t-add" title="把此标签页加入目标清单">＋</button><button class="t-clear" title="清空所有目标标签页">🗑</button></div>
+          <div class="target-head">目标 Claude 标签页 <button class="t-add" title="把此标签页加入目标清单">＋</button><button class="t-clear" title="清空所有目标标签页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div>
           <select class="t-select"><option>（清单为空，点 ＋ 添加）</option></select>
         </div>
-        <div class="tip">Ctrl/⌘+Shift+U：剪贴板文字 → 目标页　·　Ctrl/⌘+Shift+Y：截当前页 → 目标页<br/>快捷键可在 chrome://extensions/shortcuts 修改</div>
+        <div class="tip">Ctrl/⌘+Shift+U：剪贴板文字 → 目标页<br/>Ctrl/⌘+Shift+Y：截当前页 → 目标页<br/>快捷键可在 chrome://extensions/shortcuts 修改</div>
         <button class="clear">清空所有记录</button>
       </div>
     </details>
