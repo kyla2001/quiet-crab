@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Claude 静默模式 — 记录 · 点击才答",
+  "version": "0.2.0",
+  "description": "在 claude.ai 上叠加静默记录侧栏；点某条拼好上下文丢给 Claude。全局快捷键把剪贴板文字/当前标签页截图发到你指定的 Claude 标签页。",
+  "permissions": ["storage", "clipboardWrite", "clipboardRead", "tabs", "scripting", "offscreen", "activeTab"],
+  "host_permissions": ["https://claude.ai/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "upload_clipboard": {
+      "suggested_key": { "default": "Ctrl+Shift+U", "mac": "Command+Shift+U" },
+      "description": "把剪贴板文字发给目标 Claude 标签页"
+    },
+    "screenshot": {
+      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
+      "description": "截当前标签页并发给目标 Claude 标签页"
+    }
+  }
+}
