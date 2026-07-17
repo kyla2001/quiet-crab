@@ -218,7 +218,7 @@
       })
       .join("\n");
 
-    const prompt = `以下是会议记录片段：\n${ctx}\n\n${state.instruction}`;
+    const prompt = `以下是记录片段：\n${ctx}\n\n${state.instruction}`;
 
     // 备份到剪贴板，保证万一注入失败也不丢
     try { navigator.clipboard.writeText(prompt); } catch (_) {}
