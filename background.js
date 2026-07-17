@@ -23,7 +23,7 @@ async function offscreenDo(action, payload) {
   return await chrome.runtime.sendMessage({ __offscreen: true, action, payload });
 }
 
-// ---- 快捷键实际使用的目标：优先当前选中，其次清单里第一个活着的 ----
+// ---- 快捷键实际使用的目标：优先当前选中，其次清单里第一个活着的，最后随便找一个开着的 claude.ai 页 ----
 async function getTargetTab() {
   const { targetTabId } = await chrome.storage.local.get("targetTabId");
   const list = await liveTargets();
@@ -31,7 +31,16 @@ async function getTargetTab() {
     const hit = list.find((t) => t.id === targetTabId);
     if (hit) return hit;
   }
-  return list[0] || null;
+  if (list[0]) return list[0];
+  return await anyOpenClaudeTab();
+}
+
+// 目标清单是空的时候的兜底：随便挑一个已打开的 claude.ai 页（优先当前激活的那个）
+async function anyOpenClaudeTab() {
+  const tabs = await chrome.tabs.query({ url: "https://claude.ai/*" });
+  if (!tabs.length) return null;
+  const pick = tabs.find((t) => t.active) || tabs[0];
+  return { id: pick.id, title: pick.title || "Claude" };
 }
 
 // ---- 目标清单读写 ----
@@ -107,15 +116,23 @@ chrome.commands.onCommand.addListener(async (command) => {
   }
 });
 
-// ---- 投递文字：注入目标 Claude 页，填输入框并发送 ----
+// ---- 把目标标签页切到前台（必须在注入前做：目标页拿到系统焦点，填字/模拟粘贴才生效在它身上）----
+async function activateTab(tabId) {
+  try {
+    const t = await chrome.tabs.get(tabId);
+    await chrome.windows.update(t.windowId, { focused: true });
+    await chrome.tabs.update(tabId, { active: true });
+  } catch (_) {}
+}
+
+// ---- 投递文字：切到目标页，再注入填输入框并发送 ----
 async function deliverText(tabId, text) {
+  await activateTab(tabId);
   await chrome.scripting.executeScript({
     target: { tabId },
     func: injectTextAndSend,
     args: [text],
   });
-  // 顺手把目标页激活，方便你看到
-  try { const t = await chrome.tabs.get(tabId); chrome.windows.update(t.windowId, { focused: true }); chrome.tabs.update(tabId, { active: true }); } catch (_) {}
 }
 
 // ---- 投递图片：写进剪贴板 + 切到目标页 + 尝试模拟粘贴 ----
@@ -123,7 +140,7 @@ async function deliverImage(tabId, dataUrl) {
   // 1) 图片写进系统剪贴板（offscreen 完成），作为可靠兜底
   try { await offscreenDo("writeImage", dataUrl); } catch (_) {}
   // 2) 切到目标 Claude 页
-  try { const t = await chrome.tabs.get(tabId); await chrome.windows.update(t.windowId, { focused: true }); await chrome.tabs.update(tabId, { active: true }); } catch (_) {}
+  await activateTab(tabId);
   // 3) 注入：把图片作为 File 模拟 paste 事件塞进输入框（成功则直接进附件）
   await chrome.scripting.executeScript({
     target: { tabId },
