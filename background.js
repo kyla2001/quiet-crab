@@ -131,5 +131,14 @@ function injectImagePaste(dataUrl) {
     dt.items.add(file);
     const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
     el.dispatchEvent(ev);
+
+    // 图片要先上传完成 Send 按钮才会从禁用变可点；轮询等它就绪再点，而不是固定延时
+    const deadline = Date.now() + 15000;
+    const tryClick = () => {
+      const btn = document.querySelector('button[aria-label*="Send" i]') || document.querySelector('button[aria-label*="发送" i]');
+      if (btn && !btn.disabled) { btn.click(); return; }
+      if (Date.now() < deadline) setTimeout(tryClick, 300);
+    };
+    setTimeout(tryClick, 300);
   } catch (_) {}
 }
