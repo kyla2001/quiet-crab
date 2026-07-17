@@ -119,7 +119,7 @@
 
   function startRecog(SR) {
     recog = new SR();
-    recog.lang = (state.sttLang || "zh-CN");
+    recog.lang = (state.sttLang || "en-US");
     recog.continuous = true;
     recog.interimResults = true;
 
@@ -406,6 +406,8 @@
   .input { flex: 1; resize: none; height: 44px; max-height: 120px; padding: 10px 12px; border-radius: 10px; border: 1px solid #d7d9dd; background: #fff; color: #1f2328; font-size: 13.5px; line-height: 1.4; }
   .input:focus { outline: none; border-color: #f59e0b; }
   .mic, .add { border: 1px solid #d7d9dd; background: #fff; color: #1f2328; border-radius: 10px; cursor: pointer; font-size: 13px; padding: 0 12px; height: 44px; flex: none; }
+  .mic { display: flex; align-items: center; justify-content: center; }
+  .mic svg { width: 18px; height: 18px; }
   .mic.on { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
   .add { background: #b45309; border-color: #b45309; color: #fff; font-weight: 600; }
   details { margin-top: 8px; }
@@ -441,12 +443,12 @@
     <button class="close">✕</button>
   </div>
   <div class="list">
-    <div class="empty">点 🎙 开口，<b>停顿处自动分成一条条</b>，全部只记在这里、<b>不发给 Claude</b>。<br/><br/>想让 Claude 分析某句时，点那一条 —— 它会连同上下文一起丢过去作答。</div>
+    <div class="empty">点麦克风开口，<b>停顿处自动分成一条条</b>，全部只记在这里、<b>不发给 Claude</b>。<br/><br/>想让 Claude 分析某句时，点那一条 —— 它会连同上下文一起丢过去作答。</div>
   </div>
   <div class="composer">
     <div class="inputrow">
-      <textarea class="input" placeholder="🎙 点麦克风后开口，停顿即自动分条；或在此输入，回车存一条…"></textarea>
-      <button class="mic" title="语音输入：停顿自动分句">🎙</button>
+      <textarea class="input" placeholder=""></textarea>
+      <button class="mic" title="语音输入：停顿自动分句"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
       <button class="add">记一条</button>
     </div>
     <details>
