@@ -1,7 +1,6 @@
 // ── 后台协调 ────────────────────────────────────────────────────
-// 1) 记住用户在面板里选定的「目标 Claude 标签页」
-// 2) 接管两个全局快捷键：上传剪贴板文字 / 截当前标签页
-// 3) 通过 offscreen 文档读写剪贴板；通过 scripting 把内容投递进目标 Claude 页
+// 1) 接管两个全局快捷键：上传剪贴板文字 / 截当前标签页
+// 2) 通过 offscreen 文档读写剪贴板；通过 scripting 把内容投递进当前打开的 Claude 页
 
 // ---- offscreen（读剪贴板文字、写图片到剪贴板）----
 let offscreenReady = null;
@@ -23,81 +22,18 @@ async function offscreenDo(action, payload) {
   return await chrome.runtime.sendMessage({ __offscreen: true, action, payload });
 }
 
-// ---- 快捷键实际使用的目标：优先当前选中，其次清单里第一个活着的，最后随便找一个开着的 claude.ai 页 ----
+// ---- 快捷键实际使用的目标：随便挑一个已打开的 claude.ai 页，优先当前激活的那个 ----
 async function getTargetTab() {
-  const { targetTabId } = await chrome.storage.local.get("targetTabId");
-  const list = await liveTargets();
-  if (targetTabId) {
-    const hit = list.find((t) => t.id === targetTabId);
-    if (hit) return hit;
-  }
-  if (list[0]) return list[0];
-  return await anyOpenClaudeTab();
-}
-
-// 目标清单是空的时候的兜底：随便挑一个已打开的 claude.ai 页（优先当前激活的那个）
-async function anyOpenClaudeTab() {
   const tabs = await chrome.tabs.query({ url: "https://claude.ai/*" });
   if (!tabs.length) return null;
   const pick = tabs.find((t) => t.active) || tabs[0];
   return { id: pick.id, title: pick.title || "Claude" };
 }
 
-// ---- 目标清单读写 ----
-async function getTargets() {
-  const { sm_targets } = await chrome.storage.local.get("sm_targets");
-  return Array.isArray(sm_targets) ? sm_targets : [];
-}
-async function setTargets(list) { await chrome.storage.local.set({ sm_targets: list }); }
-
-// 校验清单里哪些标签页还活着，顺带更新标题
-async function liveTargets() {
-  const list = await getTargets();
-  const out = [];
-  for (const t of list) {
-    try {
-      const tab = await chrome.tabs.get(t.id);
-      if (tab && tab.url && tab.url.startsWith("https://claude.ai")) out.push({ id: tab.id, title: tab.title || t.title || "Claude" });
-    } catch (_) { /* 已关闭，丢弃 */ }
-  }
-  return out;
-}
-
-// ---- 面板发来的请求 ----
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.__offscreen) return; // 发给 offscreen 的，忽略
-  (async () => {
-    if (msg.type === "LIST_TARGETS") {
-      const targets = await liveTargets();
-      await setTargets(targets); // 顺手清掉已关闭的
-      const { targetTabId } = await chrome.storage.local.get("targetTabId");
-      const validSel = targets.some((t) => t.id === targetTabId) ? targetTabId : (targets[0] ? targets[0].id : null);
-      if (validSel !== targetTabId) await chrome.storage.local.set({ targetTabId: validSel });
-      sendResponse({ targets, targetTabId: validSel });
-    } else if (msg.type === "ADD_TARGET_CURRENT") {
-      if (sender.tab && sender.tab.id) {
-        const list = await liveTargets();
-        if (!list.some((t) => t.id === sender.tab.id)) list.push({ id: sender.tab.id, title: sender.tab.title || "Claude" });
-        await setTargets(list);
-        await chrome.storage.local.set({ targetTabId: sender.tab.id }); // 加完即设为当前
-        sendResponse({ ok: true, title: sender.tab.title });
-      } else sendResponse({ ok: false });
-    } else if (msg.type === "CLEAR_TARGETS") {
-      await setTargets([]);
-      await chrome.storage.local.set({ targetTabId: null });
-      sendResponse({ ok: true });
-    } else if (msg.type === "SET_TARGET") {
-      await chrome.storage.local.set({ targetTabId: msg.tabId });
-      sendResponse({ ok: true });
-    }
-  })();
-  return true;
-});
-
 // ---- 全局快捷键 ----
 chrome.commands.onCommand.addListener(async (command) => {
   const target = await getTargetTab();
-  if (!target) { notify("目标清单是空的：在面板里用「+」把某个 Claude 页加进来"); return; }
+  if (!target) { notify("没有打开的 claude.ai 页：先打开一个再试"); return; }
 
   if (command === "upload_clipboard") {
     let text = "";

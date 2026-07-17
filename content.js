@@ -306,42 +306,6 @@
   $(".exp-md").addEventListener("click", () => exportEntries("md"));
   $(".exp-json").addEventListener("click", () => exportEntries("json"));
 
-  // ---- 目标 Claude 标签页（用户维护的清单）----
-  const tSelect = $(".t-select");
-  function refreshTargets() {
-    chrome.runtime.sendMessage({ type: "LIST_TARGETS" }, (res) => {
-      if (!res) return;
-      tSelect.innerHTML = "";
-      if (!res.targets.length) {
-        const o = document.createElement("option");
-        o.textContent = "（清单为空，点 ＋ 添加）";
-        tSelect.appendChild(o);
-        return;
-      }
-      res.targets.forEach((t) => {
-        const o = document.createElement("option");
-        o.value = String(t.id);
-        o.textContent = t.title;
-        if (t.id === res.targetTabId) o.selected = true;
-        tSelect.appendChild(o);
-      });
-    });
-  }
-  tSelect.addEventListener("change", () => {
-    const id = parseInt(tSelect.value);
-    if (id) chrome.runtime.sendMessage({ type: "SET_TARGET", tabId: id }, () => {});
-  });
-  $(".t-add").addEventListener("click", () => {
-    chrome.runtime.sendMessage({ type: "ADD_TARGET_CURRENT" }, (res) => {
-      if (res && res.ok) { flash("已把此标签页加入目标清单"); refreshTargets(); }
-      else flash("添加失败");
-    });
-  });
-  $(".t-clear").addEventListener("click", () => {
-    if (!confirm("清空所有目标标签页？")) return;
-    chrome.runtime.sendMessage({ type: "CLEAR_TARGETS" }, () => { flash("已清空目标清单"); refreshTargets(); });
-  });
-  refreshTargets();
 
   // ---- #5：快捷键把剪贴板文字丢给 Claude ----
   // 已升级为「全局快捷键」，改由后台 background.js 接管（不再依赖 claude.ai 焦点）。
@@ -421,14 +385,6 @@
   .exprow button { background: #fff; border: 1px solid #d7d9dd; color: #374151; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 11.5px; }
   .exprow button:hover { border-color: #f59e0b; color: #b45309; }
   .tip { font-size: 11px; color: #9aa0a8; line-height: 1.5; }
-  .target { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #e2e2e5; border-radius: 8px; }
-  .target-head { font-size: 12px; font-weight: 600; color: #b45309; display: flex; align-items: center; gap: 8px; }
-  .t-add, .t-clear { background: #fff; border: 1px solid #d7d9dd; color: #6b7280; border-radius: 5px; cursor: pointer; font-size: 12px; padding: 1px 7px; line-height: 1.4; }
-  .t-clear { display: inline-flex; align-items: center; justify-content: center; }
-  .t-clear svg { width: 13px; height: 13px; }
-  .t-add:hover { border-color: #10b981; color: #059669; }
-  .t-clear:hover { border-color: #fca5a5; color: #dc2626; }
-  .t-select { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #d7d9dd; background: #fff; color: #1f2328; font-size: 12px; }
   .toast { position: fixed; right: 20px; bottom: 150px; background: #fff7ed; color: #b45309; border: 1px solid #f59e0b; padding: 8px 13px; border-radius: 9px; font-size: 12px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 340px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
   .toast.show { opacity: 1; }
 </style>
@@ -460,11 +416,7 @@
         <label><input class="auto" type="checkbox" /> 拼好后自动发送（关闭则只填入输入框，你自己按回车）</label>
         <label style="align-items:flex-start;flex-direction:column;gap:4px;">给 Claude 的指令：<textarea class="instr"></textarea></label>
         <div class="exprow">导出记录：<button class="exp-txt">.txt</button><button class="exp-md">.md</button><button class="exp-json">.json</button></div>
-        <div class="target">
-          <div class="target-head">目标 Claude 标签页 <button class="t-add" title="把此标签页加入目标清单">＋</button><button class="t-clear" title="清空所有目标标签页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div>
-          <select class="t-select"><option>（清单为空，点 ＋ 添加）</option></select>
-        </div>
-        <div class="tip">Ctrl/⌘+Shift+U：剪贴板文字 → 目标页<br/>Ctrl/⌘+Shift+Y：截当前页 → 目标页<br/>快捷键可在 chrome://extensions/shortcuts 修改</div>
+        <div class="tip">Ctrl/⌘+Shift+U：剪贴板文字 → 当前打开的 Claude 页<br/>Ctrl/⌘+Shift+Y：截当前页 → 当前打开的 Claude 页<br/>快捷键可在 chrome://extensions/shortcuts 修改</div>
         <button class="clear">清空所有记录</button>
       </div>
     </details>
