@@ -63,17 +63,25 @@
     updateStatus();
   }
 
-  // 停靠时给 <html> 右侧留出面板宽度，页面内容不再被遮住
+  // 停靠时给页面右侧留出面板宽度，页面内容不再被遮住。
+  // 实测过：真正锁死宽度的不是 html/body，而是 ChatGPT 页面里 class 带
+  // h-svh + w-screen（Tailwind 的 100vw）的最外层 div；它往下的子层都是
+  // w-full（跟着父级百分比走），所以只挤这一层，子内容会自然一起收缩，
+  // 不用再靠 overflow-x:hidden 硬裁切。若 ChatGPT 改版把这层类名换掉，
+  // dockTarget() 会退回 <html>（挤不动但至少不会裁切内容）。
   const PANEL_W = 380;
+  function dockTarget() {
+    return document.querySelector(".h-svh.w-screen") || document.documentElement;
+  }
   function applyLayout() {
     panel.classList.toggle("docked", state.docked);
     dockBtn.textContent = state.docked ? "⇤" : "⇥";
     dockBtn.title = state.docked ? "改为悬浮" : "停靠到右侧";
     const on = state.open && state.docked;
-    const de = document.documentElement;
-    de.style.transition = "margin-right .2s ease";
-    if (on) de.style.setProperty("margin-right", PANEL_W + "px", "important");
-    else de.style.removeProperty("margin-right");
+    const el = dockTarget();
+    el.style.transition = "width .2s ease";
+    if (on) el.style.setProperty("width", `calc(100vw - ${PANEL_W}px)`, "important");
+    else el.style.removeProperty("width");
   }
   function updateStatus() {
     dot.classList.toggle("on", state.open);
