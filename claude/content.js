@@ -7,9 +7,11 @@
   if (window.__claudeSilentModeLoaded) return;
   window.__claudeSilentModeLoaded = true;
 
+  const DEFAULT_PANEL_W = 380;
   const state = {
     open: false,
     docked: false,
+    panelW: DEFAULT_PANEL_W,
     entries: [],          // { id, text, t }
     contextDepth: 8,
     instruction: "请针对上面标记的这句话，结合上下文给出简明分析或建议，直接给内容。",
@@ -26,7 +28,7 @@
   });
   function saveEntries() { chrome.storage.local.set({ sm_entries: state.entries }); }
   function saveSettings() {
-    chrome.storage.local.set({ sm_settings: { contextDepth: state.contextDepth, instruction: state.instruction, autoSend: state.autoSend, docked: state.docked } });
+    chrome.storage.local.set({ sm_settings: { contextDepth: state.contextDepth, instruction: state.instruction, autoSend: state.autoSend, docked: state.docked, panelW: state.panelW } });
   }
 
   // ---- Shadow DOM 容器 ----
@@ -63,18 +65,52 @@
     updateStatus();
   }
 
-  // 停靠时给 <html> 右侧留出面板宽度，页面内容不再被遮住
-  const PANEL_W = 380;
+  // 停靠时给 <html> 右侧留出面板宽度，页面内容不再被遮住。
+  // 面板宽度可拖左边缘调整（state.panelW），margin-right 跟着它走。
+  const MIN_W = 280, MIN_PAGE_W = 320; // 面板最窄 280；至少给页面留 320
+  let dragging = false;
+  function panelW() {
+    return Math.round(Math.max(MIN_W, Math.min(state.panelW, window.innerWidth - MIN_PAGE_W)));
+  }
+  // 面板开关、停靠切换、拖动调宽、窗口缩放都走这里
   function applyLayout() {
     panel.classList.toggle("docked", state.docked);
     dockBtn.textContent = state.docked ? "⇤" : "⇥";
     dockBtn.title = state.docked ? "改为悬浮" : "停靠到右侧";
+    panel.style.width = panelW() + "px";
     const on = state.open && state.docked;
     const de = document.documentElement;
-    de.style.transition = "margin-right .2s ease";
-    if (on) de.style.setProperty("margin-right", PANEL_W + "px", "important");
+    de.style.transition = dragging ? "none" : "margin-right .2s ease"; // 拖动时要跟手，不能有动画延迟
+    if (on) de.style.setProperty("margin-right", panelW() + "px", "important");
     else de.style.removeProperty("margin-right");
   }
+  window.addEventListener("resize", applyLayout);
+
+  // ---- 拖面板左边缘调整宽度（双击恢复默认）----
+  const resizer = $(".resizer");
+  resizer.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId); // 拖出面板、划过页面 iframe 也不丢事件
+    resizer.classList.add("dragging");
+    dragging = true;
+    const startX = e.clientX, startW = panelW();
+    let frame = 0;
+    const move = (ev) => {
+      state.panelW = startW + (startX - ev.clientX); // 往左拖 = 变宽
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; applyLayout(); });
+    };
+    const end = () => {
+      resizer.removeEventListener("pointermove", move);
+      resizer.classList.remove("dragging");
+      dragging = false;
+      state.panelW = panelW(); // 存夹紧后的实际值
+      saveSettings();
+    };
+    resizer.addEventListener("pointermove", move);
+    resizer.addEventListener("pointerup", end, { once: true });
+    resizer.addEventListener("pointercancel", end, { once: true });
+  });
+  resizer.addEventListener("dblclick", () => { state.panelW = DEFAULT_PANEL_W; applyLayout(); saveSettings(); });
   function updateStatus() {
     dot.classList.toggle("on", state.open);
     statusText.textContent = state.open ? "默默记录中 · 你的话不会发给 Claude" : "已关闭";
@@ -344,7 +380,10 @@
   }
   .panel.show { display: flex; }
   /* 停靠到右侧：满高、贴边、无圆角 */
-  .panel.docked { top: 0; right: 0; bottom: 0; width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; border-right: none; box-shadow: -4px 0 24px rgba(0,0,0,.12); }
+  .panel.docked { top: 0; right: 0; bottom: 0; height: 100vh; max-height: 100vh; border-radius: 0; border-right: none; box-shadow: -4px 0 24px rgba(0,0,0,.12); }
+  /* 左边缘拖拽把手：宽度由 JS 写在 .panel 的 inline width 上 */
+  .resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 2; touch-action: none; transition: background .15s; }
+  .resizer:hover, .resizer.dragging { background: rgba(245,158,11,.35); }
   .head { display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid #ececee; background: #f7f7f8; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: #cfd2d6; flex: none; }
   .dot.on { background: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.15); }
@@ -391,6 +430,7 @@
 
 <button class="fab" title="Claude 静默模式">✦</button>
 <div class="panel">
+  <div class="resizer" title="拖动调整宽度 · 双击恢复默认"></div>
   <div class="head">
     <span class="dot"></span>
     <div class="htext">
