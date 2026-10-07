@@ -89,10 +89,11 @@ function notify(message) {
 }
 
 // ==== 下面两个函数会被注入到目标 ChatGPT 页里执行 ====
-// ChatGPT 的 composer 是 id="prompt-textarea" 的 ProseMirror contenteditable div，
-// 发送按钮为 data-testid="send-button"；两者都留通用选择器兜底，防止 ChatGPT 改版。
+// ChatGPT 的 composer 是 ProseMirror contenteditable div（新版已去掉 id="prompt-textarea"）；
+// 发送按钮按「同一 form 里的 submit 按钮」找，不依赖随界面语言变化的 aria-label。
 function injectTextAndSend(text) {
-  const el = document.querySelector("#prompt-textarea") ||
+  const el = document.querySelector('.ProseMirror[contenteditable="true"]') ||
+    document.querySelector("#prompt-textarea") ||
     document.querySelector('div[contenteditable="true"]') ||
     document.querySelector("textarea");
   if (!el) return;
@@ -110,8 +111,9 @@ function injectTextAndSend(text) {
     el.dispatchEvent(new InputEvent("input", { bubbles: true }));
   }
   setTimeout(() => {
-    const btn = document.querySelector('button[data-testid="send-button"]') ||
-      document.querySelector('button[aria-label*="Send" i]');
+    const btn = el.closest("form")?.querySelector('button[type="submit"]') ||
+      document.querySelector('button[data-testid="send-button"]') ||
+      document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
     if (btn && !btn.disabled) btn.click();
     else el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
   }, 120);
@@ -125,7 +127,8 @@ function injectImagePaste(dataUrl) {
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     const file = new File([u8], "screenshot.png", { type: mime });
-    const el = document.querySelector("#prompt-textarea") ||
+    const el = document.querySelector('.ProseMirror[contenteditable="true"]') ||
+      document.querySelector("#prompt-textarea") ||
       document.querySelector('div[contenteditable="true"]') ||
       document.querySelector("textarea");
     if (!el) return;
@@ -138,8 +141,9 @@ function injectImagePaste(dataUrl) {
     // 图片要先上传完成 Send 按钮才会从禁用变可点；轮询等它就绪再点，而不是固定延时
     const deadline = Date.now() + 15000;
     const tryClick = () => {
-      const btn = document.querySelector('button[data-testid="send-button"]') ||
-        document.querySelector('button[aria-label*="Send" i]');
+      const btn = el.closest("form")?.querySelector('button[type="submit"]') ||
+        document.querySelector('button[data-testid="send-button"]') ||
+        document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
       if (btn && !btn.disabled) { btn.click(); return; }
       if (Date.now() < deadline) setTimeout(tryClick, 300);
     };

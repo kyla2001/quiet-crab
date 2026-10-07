@@ -7,9 +7,11 @@
   if (window.__gptSilentModeLoaded) return;
   window.__gptSilentModeLoaded = true;
 
+  const DEFAULT_PANEL_W = 380;
   const state = {
     open: false,
     docked: false,
+    panelW: DEFAULT_PANEL_W,
     entries: [],          // { id, text, t }
     contextDepth: 8,
     instruction: "请针对上面标记的这句话，结合上下文给出简明分析或建议，直接给内容。",
@@ -26,7 +28,7 @@
   });
   function saveEntries() { chrome.storage.local.set({ sm_entries: state.entries }); }
   function saveSettings() {
-    chrome.storage.local.set({ sm_settings: { contextDepth: state.contextDepth, instruction: state.instruction, autoSend: state.autoSend, docked: state.docked } });
+    chrome.storage.local.set({ sm_settings: { contextDepth: state.contextDepth, instruction: state.instruction, autoSend: state.autoSend, docked: state.docked, panelW: state.panelW } });
   }
 
   // ---- Shadow DOM 容器 ----
@@ -64,25 +66,101 @@
   }
 
   // 停靠时给页面右侧留出面板宽度，页面内容不再被遮住。
-  // 实测过：真正锁死宽度的不是 html/body，而是 ChatGPT 页面里 class 带
-  // h-svh + w-screen（Tailwind 的 100vw）的最外层 div；它往下的子层都是
-  // w-full（跟着父级百分比走），所以只挤这一层，子内容会自然一起收缩，
-  // 不用再靠 overflow-x:hidden 硬裁切。若 ChatGPT 改版把这层类名换掉，
-  // dockTarget() 会退回 <html>（挤不动但至少不会裁切内容）。
-  const PANEL_W = 380;
-  function dockTarget() {
-    return document.querySelector(".h-svh.w-screen") || document.documentElement;
+  // ChatGPT 的布局层用 100vw 定宽（不理父级），而且类名是构建哈希
+  // （曾是 .h-svh.w-screen，后来变成 Layout-xxxx），写死类名每次改版都会失效。
+  // 所以不认类名，改为实测：先收窄 <html>，再找右边缘仍超出「视口宽−面板宽」
+  // 的布局层，直接把那一层挤窄，它下面 w-full 的子层会自然跟着重排。
+  // 停靠期间定时复查，ChatGPT 切换对话时重新挂载的布局层也能被挤到。
+  // 面板宽度可拖左边缘调整（state.panelW），这里所有宽度都跟着它走。
+  const MIN_W = 280, MIN_PAGE_W = 320; // 面板最窄 280；至少给页面留 320
+  const squeezed = new Map();          // 被挤窄的元素 → 它的左偏移（px）
+  let squeezeTimer = null;
+
+  function panelW() {
+    return Math.round(Math.max(MIN_W, Math.min(state.panelW, window.innerWidth - MIN_PAGE_W)));
   }
+  function setSqueezeWidth(el, left) {
+    el.style.setProperty("width", `calc(100vw - ${panelW() + left}px)`, "important");
+  }
+
+  function squeezeOverflowing() {
+    for (const el of squeezed.keys()) if (!el.isConnected) squeezed.delete(el);
+    const vw = window.innerWidth;
+    const limit = vw - panelW() + 1;
+    const squeeze = (el, left) => {
+      setSqueezeWidth(el, left);
+      squeezed.set(el, left);
+    };
+    const walk = (parent, depth) => {
+      if (depth > 14) return;
+      for (const c of parent.children) {
+        if (c === host) continue;
+        if (squeezed.has(c)) { walk(c, depth + 1); continue; }
+        const cs = getComputedStyle(c);
+        if (cs.display === "none") continue;
+        // display:contents 自身没有盒子（矩形为 0），直接穿透看子层
+        if (cs.display === "contents") { walk(c, depth + 1); continue; }
+        const r = c.getBoundingClientRect();
+        // 贴满整个视口宽的 fixed 横条（顶栏、toast 区）不受父级约束，单独收窄
+        if (cs.position === "fixed") {
+          if (r.width > 0 && r.left <= 1 && r.right >= vw - 1) squeeze(c, 0);
+          continue;
+        }
+        if (cs.position === "absolute" || r.height < 200) continue; // 只管大块布局层
+        // 挤完立刻往里查（子层大多跟着父级重排，但里面的 fixed 顶栏等要单独处理）
+        if (r.right > limit) squeeze(c, Math.max(0, Math.round(r.left)));
+        walk(c, depth + 1);
+      }
+    };
+    walk(document.body, 0);
+  }
+
+  function releaseSqueeze() {
+    for (const el of squeezed.keys()) el.style.removeProperty("width");
+    squeezed.clear();
+    document.documentElement.style.removeProperty("width");
+    clearInterval(squeezeTimer);
+    squeezeTimer = null;
+  }
+
+  // 面板开关、停靠切换、拖动调宽、窗口缩放都走这里
   function applyLayout() {
     panel.classList.toggle("docked", state.docked);
     dockBtn.textContent = state.docked ? "⇤" : "⇥";
     dockBtn.title = state.docked ? "改为悬浮" : "停靠到右侧";
+    panel.style.width = panelW() + "px";
     const on = state.open && state.docked;
-    const el = dockTarget();
-    el.style.transition = "width .2s ease";
-    if (on) el.style.setProperty("width", `calc(100vw - ${PANEL_W}px)`, "important");
-    else el.style.removeProperty("width");
+    if (!on) { releaseSqueeze(); return; }
+    document.documentElement.style.setProperty("width", `calc(100vw - ${panelW()}px)`, "important");
+    for (const [el, left] of squeezed) setSqueezeWidth(el, left);
+    squeezeOverflowing();
+    if (!squeezeTimer) squeezeTimer = setInterval(squeezeOverflowing, 1000);
   }
+  window.addEventListener("resize", applyLayout);
+
+  // ---- 拖面板左边缘调整宽度（双击恢复默认）----
+  const resizer = $(".resizer");
+  resizer.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId); // 拖出面板、划过页面 iframe 也不丢事件
+    resizer.classList.add("dragging");
+    const startX = e.clientX, startW = panelW();
+    let frame = 0;
+    const move = (ev) => {
+      state.panelW = startW + (startX - ev.clientX); // 往左拖 = 变宽
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; applyLayout(); });
+    };
+    const end = () => {
+      resizer.removeEventListener("pointermove", move);
+      resizer.classList.remove("dragging");
+      state.panelW = panelW(); // 存夹紧后的实际值
+      saveSettings();
+    };
+    resizer.addEventListener("pointermove", move);
+    resizer.addEventListener("pointerup", end, { once: true });
+    resizer.addEventListener("pointercancel", end, { once: true });
+  });
+  resizer.addEventListener("dblclick", () => { state.panelW = DEFAULT_PANEL_W; applyLayout(); saveSettings(); });
   function updateStatus() {
     dot.classList.toggle("on", state.open);
     statusText.textContent = state.open ? "默默记录中 · 你的话不会发给 ChatGPT" : "已关闭";
@@ -228,16 +306,20 @@
     else flash("已填入输入框，按回车发送");
   }
 
-  // ChatGPT 的 composer 是 id="prompt-textarea" 的 ProseMirror contenteditable div；
-  // 通用 contenteditable / textarea 选择器兜底，防止 ChatGPT 改版后 id 失效。
+  // ChatGPT 的 composer 是 ProseMirror contenteditable div（旧版带 id="prompt-textarea"，
+  // 新版已去掉 id）；发送按钮是同一个 <form> 里的 submit 按钮，aria-label 随界面
+  // 语言变（"Send" / "发送"），所以优先按 form 结构找，不依赖文案和 testid。
   function getComposerEl() {
-    return document.querySelector("#prompt-textarea") ||
+    return document.querySelector('.ProseMirror[contenteditable="true"]') ||
+      document.querySelector("#prompt-textarea") ||
       document.querySelector('div[contenteditable="true"]') ||
       document.querySelector("textarea");
   }
   function getSendBtn() {
-    return document.querySelector('button[data-testid="send-button"]') ||
-      document.querySelector('button[aria-label*="Send" i]');
+    const form = getComposerEl()?.closest("form");
+    return form?.querySelector('button[type="submit"]') ||
+      document.querySelector('button[data-testid="send-button"]') ||
+      document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
   }
 
   function injectToComposer(text) {
@@ -347,7 +429,10 @@
     transition: none;
   }
   .panel.show { display: flex; }
-  .panel.docked { top: 0; right: 0; bottom: 0; width: 380px; height: 100vh; max-height: 100vh; border-radius: 0; border-right: none; box-shadow: -4px 0 24px rgba(0,0,0,.12); }
+  .panel.docked { top: 0; right: 0; bottom: 0; height: 100vh; max-height: 100vh; border-radius: 0; border-right: none; box-shadow: -4px 0 24px rgba(0,0,0,.12); }
+  /* 左边缘拖拽把手：宽度由 JS 写在 .panel 的 inline width 上 */
+  .resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 2; touch-action: none; transition: background .15s; }
+  .resizer:hover, .resizer.dragging { background: rgba(16,163,127,.35); }
   .head { display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid #ececee; background: #f7f7f8; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: #cfd2d6; flex: none; }
   .dot.on { background: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.15); }
@@ -394,6 +479,7 @@
 
 <button class="fab" title="ChatGPT 静默模式">✦</button>
 <div class="panel">
+  <div class="resizer" title="拖动调整宽度 · 双击恢复默认"></div>
   <div class="head">
     <span class="dot"></span>
     <div class="htext">
