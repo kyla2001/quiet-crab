@@ -5,6 +5,7 @@
   "description": "在 chatgpt.com 上叠加静默记录侧栏；点某条拼好上下文丢给 ChatGPT。全局快捷键把剪贴板文字/当前标签页截图发到你指定的 ChatGPT 标签页。",
   "permissions": ["storage", "clipboardWrite", "clipboardRead", "tabs", "scripting", "offscreen", "activeTab"],
   "host_permissions": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+  "action": { "default_title": "ChatGPT 静默模式" },
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
