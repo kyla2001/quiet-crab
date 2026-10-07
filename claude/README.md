@@ -30,6 +30,7 @@ Chrome / Edge extension for **claude.ai**. Silently logs what you say, sends onl
 1. Click ✦ to open the sidebar → click the mic icon to start talking. **Pauses auto-split your speech into entries** (or type manually and press Enter to save one).
 2. Click an entry to bundle it with context and send it to the **current** claude.ai tab for an answer.
 3. Export your log anytime as `.txt` / `.md` / `.json` from Settings.
+4. Use ⇥ / ⇤ in the panel header to dock it to the right edge (the page shrinks to make room) or float it. **Drag the panel's left edge to resize** it (280px minimum, at least 320px is always left for the page); double-click the edge to reset. The width is remembered.
 
 ### Good to know
 
@@ -78,6 +79,7 @@ Your log is stored only in your local browser (`chrome.storage.local`, ~10MB, ro
 1. 点 ✦ 开侧栏 → 点麦克风图标开口,**停顿处自动分成一条条**(也可手动输入,回车存一条)。
 2. 点某一条 → 拼好上下文丢进**当前** claude.ai 页作答。
 3. 导出:设置里可导出 `.txt` / `.md` / `.json`。
+4. 面板顶部的 ⇥ / ⇤ 切换「停靠到右侧」(页面自动让出位置)和「悬浮」。**拖面板左边缘可以调宽窄**(最窄 280px,至少给页面留 320px),双击边缘恢复默认,宽度会记住。
 
 ### 必须知道的边界
 

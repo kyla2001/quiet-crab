@@ -34,11 +34,12 @@ This is the sibling version of [Quiet Crab](../claude), wired up for chatgpt.com
 1. Click ✦ to open the sidebar → click the mic icon to start talking. **Pauses auto-split your speech into entries** (or type manually and press Enter to save one).
 2. Click an entry to bundle it with context and send it to the **current** chatgpt.com tab for an answer.
 3. Export your log anytime as `.txt` / `.md` / `.json` from Settings.
+4. Use ⇥ / ⇤ in the panel header to dock it to the right edge (the page shrinks to make room) or float it. **Drag the panel's left edge to resize** it (280px minimum, at least 320px is always left for the page); double-click the edge to reset. The width is remembered.
 
 ### Good to know
 
 1. **Text delivery is fully automatic and reliable; screenshot delivery (paste + auto-send) is best-effort.** A screenshot is written to the system clipboard and pasted into the input box, then the extension polls for the Send button to become enabled (image upload takes a moment) before clicking it. If it doesn't go through, the image is still on your clipboard — just paste (Cmd/Ctrl+V) and press Enter yourself.
-2. **Depends on chatgpt.com's page structure** — filling the input box and clicking Send relies on recognizing page elements (`#prompt-textarea`, `button[data-testid="send-button"]`, with generic contenteditable/aria-label fallbacks); a ChatGPT redesign may break this, at which point the selectors in `getComposerEl()` / `getSendBtn()` (content.js) and the matching functions in background.js need updating.
+2. **Depends on chatgpt.com's page structure** — filling the input box and clicking Send relies on recognizing page elements (the `.ProseMirror` editor, and the submit button inside its `<form>` so it works in any UI language, with older-selector and generic fallbacks); a ChatGPT redesign may break this, at which point the selectors in `getComposerEl()` / `getSendBtn()` (content.js) and the matching functions in background.js need updating. Docking does **not** depend on class names: it measures which layout blocks still extend under the panel and narrows those, so it survives ChatGPT's hashed class names changing.
 3. Global shortcuts and screenshots are coordinated by the background script; the browser may show a one-time permission prompt on first use.
 
 ### Structure
@@ -86,11 +87,12 @@ Your log is stored only in your local browser (`chrome.storage.local`, ~10MB, ro
 1. 点 ✦ 开侧栏 → 点麦克风图标开口,**停顿处自动分成一条条**(也可手动输入,回车存一条)。
 2. 点某一条 → 拼好上下文丢进**当前** chatgpt.com 页作答。
 3. 导出:设置里可导出 `.txt` / `.md` / `.json`。
+4. 面板顶部的 ⇥ / ⇤ 切换「停靠到右侧」(页面自动让出位置)和「悬浮」。**拖面板左边缘可以调宽窄**(最窄 280px,至少给页面留 320px),双击边缘恢复默认,宽度会记住。
 
 ### 必须知道的边界
 
 1. **文字投递是全自动、稳的;截图「自动进输入框 + 自动发送」是尽力而为。** 截图会先写进系统剪贴板并粘贴进输入框,再等 Send 按钮从禁用变可点(图片上传中)后自动点击发送。若没自动发成功,图已经在剪贴板里,手动 Cmd/Ctrl+V 再回车即可。
-2. **依赖 chatgpt.com 页面结构**:填输入框/点发送靠识别页面元素(`#prompt-textarea`、`button[data-testid="send-button"]`,并留了通用兜底),ChatGPT 改版可能导致失效,届时更新 content.js 里的 `getComposerEl()` / `getSendBtn()` 和 background.js 里对应的选择器即可。
+2. **依赖 chatgpt.com 页面结构**:填输入框/点发送靠识别页面元素(`.ProseMirror` 编辑器,以及它所在 `<form>` 里的提交按钮,不受界面语言影响;并留了旧选择器和通用兜底),ChatGPT 改版可能导致失效,届时更新 content.js 里的 `getComposerEl()` / `getSendBtn()` 和 background.js 里对应的选择器即可。停靠**不依赖**类名:它实测哪些布局层还伸到面板底下就把哪层挤窄,所以 ChatGPT 的哈希类名变了也不受影响。
 3. 全局快捷键与截图由后台协调;首次触发时浏览器可能就权限弹一次确认。
 
 ### 结构
