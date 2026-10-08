@@ -347,13 +347,17 @@
     return true;
   }
 
+  // ChatGPT 输入框为空时表单里没有发送按钮（那个位置是「开始语音」），要等填入文字、
+  // React 重新渲染后才换成发送按钮；所以轮询等它出现，而不是固定延时。
   function trySend() {
-    setTimeout(() => {
+    const deadline = Date.now() + 5000;
+    const tick = () => {
       const btn = getSendBtn();
       if (btn && !btn.disabled) { btn.click(); return; }
-      const el = getComposerEl();
-      if (el) el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-    }, 80);
+      if (Date.now() < deadline) { setTimeout(tick, 100); return; }
+      flash("没等到发送按钮，已填入输入框，按回车发送");
+    };
+    setTimeout(tick, 80);
   }
 
   // ---- 设置区 ----

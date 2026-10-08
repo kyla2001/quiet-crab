@@ -110,13 +110,16 @@ function injectTextAndSend(text) {
     } catch (_) { el.textContent = text; }
     el.dispatchEvent(new InputEvent("input", { bubbles: true }));
   }
-  setTimeout(() => {
+  // 输入框为空时没有发送按钮，填入文字后 React 才换上来；轮询等它出现，而不是固定延时
+  const deadline = Date.now() + 5000;
+  const tryClick = () => {
     const btn = el.closest("form")?.querySelector('button[type="submit"]') ||
       document.querySelector('button[data-testid="send-button"]') ||
       document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
-    if (btn && !btn.disabled) btn.click();
-    else el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-  }, 120);
+    if (btn && !btn.disabled) { btn.click(); return; }
+    if (Date.now() < deadline) setTimeout(tryClick, 100);
+  };
+  setTimeout(tryClick, 80);
 }
 
 function injectImagePaste(dataUrl) {
