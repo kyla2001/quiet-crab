@@ -89,13 +89,17 @@ function notify(message) {
 }
 
 // ==== 下面两个函数会被注入到目标 ChatGPT 页里执行 ====
-// ChatGPT 的 composer 是 ProseMirror contenteditable div（新版已去掉 id="prompt-textarea"）；
-// 发送按钮按「同一 form 里的 submit 按钮」找，不依赖随界面语言变化的 aria-label。
+// 注入函数会被序列化后在页面里执行，不能引用外面的函数，所以找输入框的逻辑各写一份。
+// 只认「可见的、在 <form> 里的」输入框（优先带 data-composer-markdown）：站内切换对话后
+// 旧视图的输入框还隐藏在 DOM 里；画布等编辑器不在输入框的 form 里，不能用通用兜底。
+// 发送按钮只在该 form 里找 submit 按钮，不依赖随界面语言变化的 aria-label。
 function injectTextAndSend(text) {
-  const el = document.querySelector('.ProseMirror[contenteditable="true"]') ||
-    document.querySelector("#prompt-textarea") ||
-    document.querySelector('div[contenteditable="true"]') ||
-    document.querySelector("textarea");
+  const el = (() => {
+    const cands = [...document.querySelectorAll(
+      '[data-composer-markdown][contenteditable="true"], form [contenteditable="true"], form textarea'
+    )].filter((e) => (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0));
+    return cands.find((e) => e.hasAttribute("data-composer-markdown")) || cands[0] || null;
+  })();
   if (!el) return;
   el.focus();
   if (el.tagName === "TEXTAREA") {
@@ -113,9 +117,7 @@ function injectTextAndSend(text) {
   // 输入框为空时没有发送按钮，填入文字后 React 才换上来；轮询等它出现，而不是固定延时
   const deadline = Date.now() + 5000;
   const tryClick = () => {
-    const btn = el.closest("form")?.querySelector('button[type="submit"]') ||
-      document.querySelector('button[data-testid="send-button"]') ||
-      document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
+    const btn = el.closest("form")?.querySelector('button[type="submit"], button[data-testid="send-button"]');
     if (btn && !btn.disabled) { btn.click(); return; }
     if (Date.now() < deadline) setTimeout(tryClick, 100);
   };
@@ -130,10 +132,12 @@ function injectImagePaste(dataUrl) {
     const u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     const file = new File([u8], "screenshot.png", { type: mime });
-    const el = document.querySelector('.ProseMirror[contenteditable="true"]') ||
-      document.querySelector("#prompt-textarea") ||
-      document.querySelector('div[contenteditable="true"]') ||
-      document.querySelector("textarea");
+    const el = (() => {
+      const cands = [...document.querySelectorAll(
+        '[data-composer-markdown][contenteditable="true"], form [contenteditable="true"], form textarea'
+      )].filter((e) => (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0));
+      return cands.find((e) => e.hasAttribute("data-composer-markdown")) || cands[0] || null;
+    })();
     if (!el) return;
     el.focus();
     const dt = new DataTransfer();
@@ -144,9 +148,7 @@ function injectImagePaste(dataUrl) {
     // 图片要先上传完成 Send 按钮才会从禁用变可点；轮询等它就绪再点，而不是固定延时
     const deadline = Date.now() + 15000;
     const tryClick = () => {
-      const btn = el.closest("form")?.querySelector('button[type="submit"]') ||
-        document.querySelector('button[data-testid="send-button"]') ||
-        document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
+      const btn = el.closest("form")?.querySelector('button[type="submit"], button[data-testid="send-button"]');
       if (btn && !btn.disabled) { btn.click(); return; }
       if (Date.now() < deadline) setTimeout(tryClick, 300);
     };

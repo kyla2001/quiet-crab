@@ -306,20 +306,23 @@
     else flash("已填入输入框，按回车发送");
   }
 
-  // ChatGPT 的 composer 是 ProseMirror contenteditable div（旧版带 id="prompt-textarea"，
-  // 新版已去掉 id）；发送按钮是同一个 <form> 里的 submit 按钮，aria-label 随界面
-  // 语言变（"Send" / "发送"），所以优先按 form 结构找，不依赖文案和 testid。
+  // 只认「可见的、在 <form> 里的」输入框，优先带 data-composer-markdown 标记的那个：
+  // - ChatGPT 站内切换对话后，上一个视图的输入框还留在 DOM 里，只是隐藏（0×0），
+  //   取第一个就会写进看不见的输入框；所以必须过滤可见性。
+  // - 画布、消息编辑等也是 contenteditable，但不在输入框的 form 里；不能用
+  //   通用 contenteditable 兜底，否则会写进画布。
   function getComposerEl() {
-    return document.querySelector('.ProseMirror[contenteditable="true"]') ||
-      document.querySelector("#prompt-textarea") ||
-      document.querySelector('div[contenteditable="true"]') ||
-      document.querySelector("textarea");
+    const visible = (e) => (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0);
+    const cands = [...document.querySelectorAll(
+      '[data-composer-markdown][contenteditable="true"], form [contenteditable="true"], form textarea'
+    )].filter(visible);
+    return cands.find((e) => e.hasAttribute("data-composer-markdown")) || cands[0] || null;
   }
+  // 发送按钮 = 输入框所在 form 里的 submit 按钮（aria-label 随界面语言变，不按文案找）；
+  // 只在这个 form 里找，避免点到隐藏视图或别处的按钮。
   function getSendBtn() {
     const form = getComposerEl()?.closest("form");
-    return form?.querySelector('button[type="submit"]') ||
-      document.querySelector('button[data-testid="send-button"]') ||
-      document.querySelector('button[aria-label*="Send" i], button[aria-label*="发送"]');
+    return form?.querySelector('button[type="submit"], button[data-testid="send-button"]') || null;
   }
 
   function injectToComposer(text) {
